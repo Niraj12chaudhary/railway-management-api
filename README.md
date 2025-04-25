@@ -1,140 +1,147 @@
-# Railway Management System API (IRCTC-like)
+# Railway Management System API
 
-This is a RESTful API for a railway management system similar to IRCTC, where users can check train availability between stations and book seats.
+A RESTful backend system for managing railway operations including train schedules, station information, and seat booking functionality.
 
-## Features
+## Core Features
 
-- User Registration and Authentication with JWT tokens
-- Role-based access control (Admin and Regular User roles)
-- Admin endpoints for managing trains, stations, and routes (protected by API key)
-- Check train availability between source and destination
-- Book seats with race condition handling
-- View booking details and user bookings
+- JWT-based authentication with role segregation (Admin/User)
+- PostgreSQL database integration
+- Admin operations with API key protection
+- Race condition handling for concurrent booking attempts
+- Comprehensive API for railway operations management
 
-## Technology Stack
+## Tech Stack
 
-- **Framework**: Django / Django REST Framework
-- **Database**: PostgreSQL
-- **Authentication**: JWT (JSON Web Tokens)
-- **API Documentation**: Django REST framework docs
+- Django 4.2.4
+- Django REST Framework 3.14.0
+- PostgreSQL
+- JWT Authentication (Simple JWT)
+- Django REST Framework docs
 
-## Project Setup
+## Development Setup
 
-### Prerequisites
+### System Requirements
 
 - Python 3.8+
-- PostgreSQL
+- PostgreSQL 12+
+- Git
 
-### Installation
+### Local Setup
 
 1. Clone the repository
-```
-git clone <repository-url>
+```bash
+git clone https://github.com/your-username/railway-management-api.git
 cd railway-management-api
 ```
 
-2. Create and activate a virtual environment
-```
+2. Set up virtual environment
+```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Windows
+venv\Scripts\activate
+# Linux/Mac
+source venv/bin/activate
 ```
 
 3. Install dependencies
-```
+```bash
 pip install -r requirements.txt
 ```
 
-4. Database Setup
-   - Create a PostgreSQL database named `railway_db`
-   - Update database credentials in `settings.py` if needed
+4. Database Configuration
+   - Create PostgreSQL database
+   ```sql
+   CREATE DATABASE railway_db;
+   ```
+   - Configure database settings in `irctc_api/settings.py`:
    ```python
    DATABASES = {
        'default': {
            'ENGINE': 'django.db.backends.postgresql',
            'NAME': 'railway_db',
-           'USER': 'postgres',  # Change if needed
-           'PASSWORD': 'postgres',  # Change if needed
+           'USER': 'postgres',
+           'PASSWORD': 'your-db-password',
            'HOST': 'localhost',
            'PORT': '5432',
        }
    }
    ```
 
-5. Run migrations
-```
-python manage.py makemigrations
+5. Apply database migrations
+```bash
 python manage.py migrate
 ```
 
-6. Create a superuser (this will be your admin)
-```
+6. Create admin user
+```bash
 python manage.py createsuperuser
 ```
-   - When prompted, provide email, username, and password
-   - The system will automatically set the role to 'ADMIN' for superusers
 
-7. Start the development server
-```
+7. Start development server
+```bash
 python manage.py runserver
 ```
 
-## API Endpoints
+## API Reference
 
-### Authentication
+### Authentication Endpoints
 
-- **Register User**: `POST /api/users/register/`
-  - Request: `{ "username": "user1", "email": "user@example.com", "password": "password", "password_confirm": "password", "first_name": "First", "last_name": "Last" }`
-  - Response: User details with JWT tokens
+| Endpoint | Method | Description | Request Body |
+|----------|--------|-------------|-------------|
+| `/api/users/register/` | POST | Register new user | `{"email": "user@example.com", "username": "user1", "password": "password123"}` |
+| `/api/users/login/` | POST | User login | `{"email": "user@example.com", "password": "password123"}` |
+| `/api/users/token/refresh/` | POST | Refresh access token | `{"refresh": "<refresh_token>"}` |
 
-- **Login User**: `POST /api/users/login/`
-  - Request: `{ "email": "user@example.com", "password": "password" }`
-  - Response: User details with JWT tokens
-
-- **Refresh Token**: `POST /api/users/token/refresh/`
-  - Request: `{ "refresh": "<refresh_token>" }`
-  - Response: New access token
-
-### Admin Endpoints (Protected by API Key)
+### Admin Endpoints
 
 All admin endpoints require:
-- Authorization header: `Bearer <access_token>`
-- X-API-KEY header: `railway_management_admin_api_key`
+- Header: `Authorization: Bearer <access_token>`
+- Header: `X-API-KEY: railway_management_admin_api_key`
 
-- **Add/List Stations**: `POST/GET /api/railway/admin/stations/`
-  - Add: `{ "name": "New Delhi", "code": "NDLS", "city": "Delhi" }`
-
-- **Add/List Trains**: `POST/GET /api/railway/admin/trains/`
-  - Add: `{ "name": "Rajdhani Express", "train_number": "12301", "total_seats": 500 }`
-
-- **Add/List Routes**: `POST/GET /api/railway/admin/routes/`
-  - Add: `{ "train": 1, "source": 1, "destination": 2, "departure_time": "2023-08-15T10:00:00Z", "arrival_time": "2023-08-15T18:00:00Z" }`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/railway/admin/stations/` | GET/POST | Get all or create station |
+| `/api/railway/admin/trains/` | GET/POST | Get all or create train |
+| `/api/railway/admin/routes/` | GET/POST | Get all or create route |
 
 ### User Endpoints
 
-- **Check Train Availability**: `GET /api/railway/availability/?source=1&destination=2`
-  - Response: List of available trains with seat counts
+| Endpoint | Method | Description | Authentication |
+|----------|--------|-------------|---------------|
+| `/api/railway/availability/?source=1&destination=2` | GET | Check train availability | Not required |
+| `/api/railway/book/` | POST | Book a seat | Required |
+| `/api/railway/bookings/` | GET | List user bookings | Required |
+| `/api/railway/bookings/<uuid>/` | GET | Get booking details | Required |
 
-- **Book a Seat**: `POST /api/railway/book/` (requires authentication)
-  - Request: `{ "route_id": 1 }`
-  - Response: Booking details
+## Concurrency Handling
 
-- **View Booking Details**: `GET /api/railway/bookings/<booking_id>/` (requires authentication)
-  - Response: Detailed booking information
+The booking system implements database-level locking using Django's `select_for_update()` to prevent race conditions during concurrent booking attempts. The transaction isolation ensures that:
 
-- **View User Bookings**: `GET /api/railway/bookings/` (requires authentication)
-  - Response: List of user's bookings
+1. Seat availability is checked within a transaction
+2. Row-level locking prevents parallel updates to the same route
+3. Available seats are decremented atomically
 
-## Race Condition Handling
-
-The seat booking system uses database transactions with row-level locking (`select_for_update`) to handle race conditions when multiple users attempt to book seats simultaneously. This ensures that only one booking operation can modify the seat availability data at a time, preventing overbooking.
+Implementation:
+```python
+with transaction.atomic():
+    route = Route.objects.select_for_update().get(id=route_id)
+    # Booking logic and seat allocation
+```
 
 ## API Documentation
 
-API documentation is available at `/docs/` endpoint when the server is running.
+Interactive API documentation is available at `/docs/` when the server is running.
 
-## Security
+## Testing
 
-- JWT authentication ensures secure access to protected endpoints
-- Admin endpoints are protected by both JWT and API key
-- API keys should be stored as environment variables in production
-- Password validation ensures strong user passwords
+To run the test suite:
+```bash
+python manage.py test
+```
+
+## Security Considerations
+
+- API keys for admin endpoints should be stored in environment variables in production
+- JWT tokens have a configurable expiry (default: access=1h, refresh=1d)
+- User passwords are hashed using Django's default PBKDF2 algorithm
+- Database connections use TLS in production environment

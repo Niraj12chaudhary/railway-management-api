@@ -3,28 +3,28 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 import uuid
 
-# Create your models here.
+# DB models for railway management system
 
 class Station(models.Model):
-    """Model representing a railway station"""
+    """Station entity with unique identifiers"""
     name = models.CharField(max_length=100, unique=True)
-    code = models.CharField(max_length=10, unique=True)
+    code = models.CharField(max_length=10, unique=True)  # Station code (e.g. NDLS for New Delhi)
     city = models.CharField(max_length=100)
     
     def __str__(self):
         return f"{self.name} ({self.code})"
 
 class Train(models.Model):
-    """Model representing a train"""
+    """Train entity with capacity info"""
     name = models.CharField(max_length=100)
-    train_number = models.CharField(max_length=20, unique=True)
+    train_number = models.CharField(max_length=20, unique=True)  # Unique identifier
     total_seats = models.PositiveIntegerField()
     
     def __str__(self):
         return f"{self.name} ({self.train_number})"
 
 class Route(models.Model):
-    """Model representing a train route between two stations"""
+    """Route mapping between stations with schedule data"""
     train = models.ForeignKey(Train, on_delete=models.CASCADE, related_name='routes')
     source = models.ForeignKey(Station, on_delete=models.CASCADE, related_name='departures')
     destination = models.ForeignKey(Station, on_delete=models.CASCADE, related_name='arrivals')
@@ -39,23 +39,23 @@ class Route(models.Model):
         return f"{self.train.name}: {self.source.code} to {self.destination.code}"
     
     def clean(self):
-        # Validate that arrival time is after departure time
+        # Validate time consistency
         if self.arrival_time <= self.departure_time:
             raise ValidationError("Arrival time must be after departure time")
         
-        # Validate that source and destination are different
+        # Validate route logic
         if self.source == self.destination:
             raise ValidationError("Source and destination stations cannot be the same")
     
     def save(self, *args, **kwargs):
-        # Set initial available seats to total seats of the train if not specified
+        # Initialize seat count if not provided
         if not self.pk and self.available_seats is None:
             self.available_seats = self.train.total_seats
         self.clean()
         super().save(*args, **kwargs)
 
 class Booking(models.Model):
-    """Model representing a seat booking"""
+    """Booking entity with user and route info"""
     booking_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bookings')
     route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name='bookings')

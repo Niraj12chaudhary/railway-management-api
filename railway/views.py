@@ -11,32 +11,27 @@ from .serializers import (
     RouteAvailabilitySerializer, BookingSerializer, BookTicketSerializer
 )
 
-# Custom permissions
+# Custom permission classes
 class IsAdminUser(permissions.BasePermission):
-    """
-    Allows access only to admin users.
-    """
+    """Checks if user is authenticated and has admin privileges."""
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated and request.user.is_admin
 
 class AdminAPIKeyPermission(permissions.BasePermission):
-    """
-    Allows access only with valid API key in header.
-    """
+    """Validates API key in request header."""
     def has_permission(self, request, view):
         # In Django, X-API-KEY becomes HTTP_X_API_KEY in request.META
         api_key_header = 'HTTP_' + settings.API_KEY_HEADER.replace('-', '_').upper()
         api_key = request.META.get(api_key_header)
         return api_key == settings.API_KEY
 
-# Admin Views
+# Admin API endpoints
 class StationView(APIView):
-    """
-    Admin endpoint to manage stations
-    """
+    """Handles CRUD operations for stations."""
     permission_classes = [IsAuthenticated, IsAdminUser, AdminAPIKeyPermission]
     
     def post(self, request):
+        """Creates a new station."""
         serializer = StationSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -44,17 +39,17 @@ class StationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def get(self, request):
+        """Retrieves all stations."""
         stations = Station.objects.all()
         serializer = StationSerializer(stations, many=True)
         return Response(serializer.data)
 
 class TrainView(APIView):
-    """
-    Admin endpoint to manage trains
-    """
+    """Handles CRUD operations for trains."""
     permission_classes = [IsAuthenticated, IsAdminUser, AdminAPIKeyPermission]
     
     def post(self, request):
+        """Creates a new train."""
         serializer = TrainSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -62,20 +57,20 @@ class TrainView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def get(self, request):
+        """Retrieves all trains."""
         trains = Train.objects.all()
         serializer = TrainSerializer(trains, many=True)
         return Response(serializer.data)
 
 class RouteView(APIView):
-    """
-    Admin endpoint to manage routes
-    """
+    """Handles CRUD operations for routes."""
     permission_classes = [IsAuthenticated, IsAdminUser, AdminAPIKeyPermission]
     
     def post(self, request):
+        """Creates a new route."""
         serializer = RouteSerializer(data=request.data)
         if serializer.is_valid():
-            # Ensure available_seats is set to train's total_seats
+            # Initialize available seats to train's total seats
             train = Train.objects.get(pk=serializer.validated_data['train'].id)
             serializer.validated_data['available_seats'] = train.total_seats
             serializer.save()
@@ -83,15 +78,14 @@ class RouteView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def get(self, request):
+        """Retrieves all routes."""
         routes = Route.objects.all()
         serializer = RouteSerializer(routes, many=True)
         return Response(serializer.data)
 
-# User Views
+# User API endpoints
 class TrainAvailabilityView(APIView):
-    """
-    Endpoint to check available trains between source and destination
-    """
+    """Checks train availability between source and destination."""
     def get(self, request):
         source_id = request.query_params.get('source')
         destination_id = request.query_params.get('destination')
@@ -112,9 +106,7 @@ class TrainAvailabilityView(APIView):
         return Response(serializer.data)
 
 class BookSeatView(APIView):
-    """
-    Endpoint to book a seat on a train
-    """
+    """Books a seat on a train."""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
@@ -184,9 +176,7 @@ class BookSeatView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class BookingDetailView(APIView):
-    """
-    Endpoint to get details of a specific booking
-    """
+    """Retrieves details of a specific booking."""
     permission_classes = [IsAuthenticated]
     
     def get(self, request, booking_id):
@@ -201,9 +191,7 @@ class BookingDetailView(APIView):
             )
 
 class UserBookingsView(APIView):
-    """
-    Endpoint to get all bookings of a user
-    """
+    """Retrieves all bookings of a user."""
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
